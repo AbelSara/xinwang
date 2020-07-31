@@ -211,7 +211,7 @@ train['modg'] = (train.acc_xg ** 2 + train.acc_yg ** 2 + train.acc_zg ** 2) ** .
 test['mod'] = (test.acc_x ** 2 + test.acc_y ** 2 + test.acc_z ** 2) ** .5
 test['modg'] = (test.acc_xg ** 2 + test.acc_yg ** 2 + test.acc_zg ** 2) ** .5
 
-model_name = '/media/brl/RaspberryPiData/xinwang/Model4_drop3+bn_bs256+lr3e-4+centerloss0.005+mixup0.3+3seed/'
+model_name = '/media/brl/RaspberryPiData/xinwang/Model4_drop3+bn_bs256+lr3e-4+centerloss0.005+mixup0.3+3seed'
 if not os.path.exists(model_name):
     os.mkdir(model_name)
 
@@ -333,7 +333,7 @@ for fold, (xx, yy) in enumerate(kfold.split(x, y)):
                                    verbose=0,
                                    mode='max',
                                    patience=200)
-    checkpoint = ModelCheckpoint(model_name+f'model{count}.h5',
+    checkpoint = ModelCheckpoint(model_name+'/'+f'model{count}.h5',
                                  monitor='val_behaviour_acc',
                                  verbose=0,
                                  mode='max',
@@ -361,7 +361,7 @@ for fold, (xx, yy) in enumerate(kfold.split(x, y)):
     #           shuffle=True,
     #           validation_data=([x_val, y_val], [y_val, dummy2]),
     #           callbacks=[checkpoint])
-    model.load_weights(model_name+f'model{count}.h5', {'SeqSelfAttention': SeqSelfAttention})
+    model.load_weights(model_name+'/'+f'model{count}.h5', {'SeqSelfAttention': SeqSelfAttention})
     p, _ = model.predict([t, t_dummy], verbose=0, batch_size=batch_size)
     # sub.behavior_id = np.argmax(p, axis=1)
     # pred_list.append(np.argmax(p, axis=1))
@@ -380,9 +380,9 @@ print(valid_pred_list)
 acc_res = sum(valid_pred_list) / 30
 print(acc_res)
 # vote_res = res_vote(pred_list)
-np.save(model_name+'proba.npy', proba_t)
+np.save(model_name+'/proba.npy', proba_t)
 sub.behavior_id = np.argmax(proba_t, axis=1)
-sub.to_csv(model_name+str(acc_res)+'_drop3_bn_bs256+lr3e-4+centerloss0.005+mixup0.3+3seed.csv', index=False)
+sub.to_csv(model_name+'/'+str(acc_res)+model_name+'.csv', index=False)
 
 # sub.behavior_id = vote_res
 # sub.to_csv(model_name+str(acc_res)+'_drop3_bn_bs256+lr3e-4+centerloss0.005+mixup0.3+vote.csv', index=False)

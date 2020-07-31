@@ -97,7 +97,7 @@ train['modg'] = (train.acc_xg ** 2 + train.acc_yg ** 2 + train.acc_zg ** 2) ** .
 test['mod'] = (test.acc_x ** 2 + test.acc_y ** 2 + test.acc_z ** 2) ** .5
 test['modg'] = (test.acc_xg ** 2 + test.acc_yg ** 2 + test.acc_zg ** 2) ** .5
 
-model_name = 'Model5_drop3+bn_bs256+lr3e-4+mixup0.3/'
+model_name = 'Model5_drop3+bn_bs256+lr3e-4+mixup0.3'
 if os.path.exists(model_name):
     shutil.rmtree(model_name)
 os.mkdir(model_name)
@@ -134,7 +134,7 @@ for fold, (xx, yy) in enumerate(kfold.split(x, y)):
                                    verbose=0,
                                    mode='max',
                                    patience=100)
-    checkpoint = ModelCheckpoint(model_name+f'fold{fold}.h5',
+    checkpoint = ModelCheckpoint(model_name+'/'+f'fold{fold}.h5',
                                  monitor='val_acc',
                                  verbose=0,
                                  mode='max',
@@ -152,7 +152,7 @@ for fold, (xx, yy) in enumerate(kfold.split(x, y)):
               shuffle=True,
               validation_data=(x[yy], y_[yy]),
               callbacks=[early_stopping, checkpoint])
-    model.load_weights(model_name+f'fold{fold}.h5', {'SeqSelfAttention': SeqSelfAttention})
+    model.load_weights(model_name+'/'+f'fold{fold}.h5', {'SeqSelfAttention': SeqSelfAttention})
     proba_t += model.predict(t, verbose=0, batch_size=256) / 10.
     valid_pred = model.predict(x[yy], verbose=0, batch_size=256)
     acc = cul_acc_combo(y[yy], np.argmax(valid_pred, axis=1))
@@ -163,4 +163,4 @@ acc_res = sum(valid_pred_list) / 10
 print(acc_res)
 
 sub.behavior_id = np.argmax(proba_t, axis=1)
-sub.to_csv(model_name+str(acc_res)+'_drop3+bn_bs256+5e-4+mixup0.3.csv', index=False)
+sub.to_csv(model_name+'/'+str(acc_res)+model_name+'.csv', index=False)
