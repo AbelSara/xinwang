@@ -7,7 +7,7 @@ from scipy.signal import resample
 import keras
 import keras.backend as K
 from Model.Model4 import Net
-from keras.optimizers import Adam, SGD
+from keras.optimizers import Adam, SGD, RMSprop
 from keras.utils import to_categorical
 from sklearn.model_selection import StratifiedKFold
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
@@ -151,6 +151,26 @@ def cul_acc_combo(y, y_pred):
         score_.append(acc_combo(y[i],y_pred[i]))
     return np.mean(score_)
 
+def jitter(x, snr_db):
+    """
+    根据信噪比添加噪声
+    :param x:
+    :param snr_db:
+    :return:
+    """
+    # 随机选择信噪比
+    assert isinstance(snr_db, list)
+    snr_db_low = snr_db[0]
+    snr_db_up = snr_db[1]
+    snr_db = np.random.randint(snr_db_low, snr_db_up, (1,))[0]
+
+    snr = 10 ** (snr_db / 10)
+    Xp = np.sum(x ** 2, axis=0, keepdims=True) / x.shape[0]  # 计算信号功率
+    Np = Xp / snr  # 计算噪声功率
+    n = np.random.normal(size=x.shape, scale=np.sqrt(Np), loc=0.0)  # 计算噪声
+    xn = x + n
+    return xn
+
 def standardization(X, mean, std):
     x1 = X.transpose(0, 1, 3, 2)
     #x1 = X
@@ -170,6 +190,17 @@ def cul_mean_std(X):
     s = np.std(X, axis=0)
     return m, s
 
+def res_vote(pred_list):
+    res = []
+    sample_len = pred_list[0].shape[0]
+    for i in range(sample_len):
+        count = np.zeros(19)
+        for pred in pred_list:
+            count[pred[i]] += 1
+        res.append(count.argmax())
+    return res
+
+
 train = pd.read_csv('sensor_train.csv')
 test = pd.read_csv('sensor_test.csv')
 sub = pd.read_csv('提交结果示例.csv')
@@ -180,10 +211,9 @@ train['modg'] = (train.acc_xg ** 2 + train.acc_yg ** 2 + train.acc_zg ** 2) ** .
 test['mod'] = (test.acc_x ** 2 + test.acc_y ** 2 + test.acc_z ** 2) ** .5
 test['modg'] = (test.acc_xg ** 2 + test.acc_yg ** 2 + test.acc_zg ** 2) ** .5
 
-model_name = '/media/brl/RaspberryPiData/xinwang/Model4_drop2+bn_bs256+lr3e-4+centerloss0.005+mixup0.3+cbma/'
-if os.path.exists(model_name):
-    shutil.rmtree(model_name)
-os.mkdir(model_name)
+model_name = '/media/brl/RaspberryPiData/xinwang/Model4_drop3+bn_bs256+lr3e-4+centerloss0.005+mixup0.3+3seed/'
+if not os.path.exists(model_name):
+    os.mkdir(model_name)
 
 x = np.zeros((7292, 60, 8, 1))
 t = np.zeros((7500, 60, 8, 1))
@@ -196,8 +226,29 @@ for i in tqdm(range(7500)):
     tmp = test[test.fragment_id == i][:60]
     t[i,:,:, 0] = resample(tmp.drop(['fragment_id', 'time_point'],
                                     axis=1), 60, np.array(tmp.time_point))[0]
-# x = standardization(x)
-# t = standardization(t)
+# mean1, std1 = cul_mean_std(x)
+# mean2, std2 = cul_mean_std(t)
+# x = x.reshape((7292*60, 8))
+# t = t.reshape((7500*60, 8))
+# print('mean of train set: '+str(np.mean(x, axis=0)))
+# print('mean of test set: '+str(np.mean(t, axis=0)))
+# print('std of train set: '+str(np.std(x, axis=0)))
+#
+# print('std of test set: '+str(np.std(t, axis=0)))
+# x = x.reshape((7292, 60, 8, 1))
+# t = t.reshape((7500, 60, 8, 1))
+# x = standardization(x, mean1, std1)
+# t = standardization(t, mean2, std2)
+# #x = jitter(x, [-1,1])
+# x = x.reshape((7292*60, 8))
+# t = t.reshape((7500*60, 8))
+# print('after norm mean of train set: '+str(np.mean(x, axis=0)))
+# print('after norm mean of test set: '+str(np.mean(t, axis=0)))
+# print('after norm std of train set: '+str(np.std(x, axis=0)))
+#
+# print('after norm std of test set: '+str(np.std(t, axis=0)))
+# x = x.reshape((7292, 60, 8, 1))
+# t = t.reshape((7500, 60, 8, 1))
 # scaler = MinMaxScaler((-1, 1))
 # x = x.reshape((7292*60, 8))
 # t = t.reshape((7500*60, 8))
@@ -221,22 +272,29 @@ for i in tqdm(range(7500)):
 # print(x[0, :, 0, 0])
 # print(t[0, :, 0, 0])
 lambda_centerloss=0.005
-seed = 1
+# seed = 1
 batch_size = 256
-kfold = StratifiedKFold(10, shuffle=True, random_state=seed)
+
 valid_pred_list = []
 proba_t = np.zeros((7500, 19))
 warmup_epoch = 10
 learning_rate_base = 0.001
 epochs = 1000
+noise_SNR_db = [-5, 15]
+pred_list = []
 # t = time.strftime('%Y-%m-%d-%H:%M:%S', time.localtime(time.time()))
+count = 0
+seed = 1
+# for seed in seeds:
+kfold = StratifiedKFold(10, shuffle=True, random_state=seed)
 for fold, (xx, yy) in enumerate(kfold.split(x, y)):
-    mu, sigma = cul_mean_std(x[xx])
-    print(mu)
-    print(sigma)
+    # mu, sigma = cul_mean_std(x[xx])
+    # print(mu)
+    # print(sigma)
     x_train = x[xx]
     x_val = x[yy]
     # x_train = standardization(x[xx], mu, sigma)
+    # x_train = jitter(x_train, noise_SNR_db)
     # x_val = standardization(x[yy], mu, sigma)
     # t_standard = standardization(t, mu, sigma)
 
@@ -257,7 +315,7 @@ for fold, (xx, yy) in enumerate(kfold.split(x, y)):
                   metrics=['acc'])
     model.summary()
     # Compute the number of warmup batches.
-    warmup_batches = warmup_epoch * sample_count / batch_size
+    # warmup_batches = warmup_epoch * sample_count / batch_size
 
     # Create the Learning rate scheduler.
     # warm_up_lr = WarmUpCosineDecayScheduler(learning_rate_base=learning_rate_base,
@@ -265,16 +323,17 @@ for fold, (xx, yy) in enumerate(kfold.split(x, y)):
     #                                         warmup_learning_rate=0.0,
     #                                         warmup_steps=warmup_steps,
     #                                         hold_base_rate_steps=0)
-    plateau = ReduceLROnPlateau(monitor="val_behaviour_acc",
-                                verbose=0,
+    plateau = ReduceLROnPlateau(monitor="val_acc",
+                                verbose=1,
                                 mode='max',
                                 factor=0.5,
-                                patience=20)
+                                patience=20,
+                                min_lr=1e-4)
     early_stopping = EarlyStopping(monitor='val_behaviour_acc',
                                    verbose=0,
                                    mode='max',
                                    patience=200)
-    checkpoint = ModelCheckpoint(model_name+f'fold{fold}.h5',
+    checkpoint = ModelCheckpoint(model_name+f'model{count}.h5',
                                  monitor='val_behaviour_acc',
                                  verbose=0,
                                  mode='max',
@@ -294,17 +353,20 @@ for fold, (xx, yy) in enumerate(kfold.split(x, y)):
     #     print(str(i) + " total in train set: "+str(sum(y[xx]==i)))
     # for i in range(19):
     #     print(str(i) + " total in valid set: " + str(sum(y[yy] == i)))
-    model.fit_generator(generator=training_generator,
-                    steps_per_epoch=x_train.shape[0] // batch_size,
-              epochs=1000,
-              # batch_size=256,
-              verbose=1,
-              shuffle=True,
-              validation_data=([x_val, y_val], [y_val, dummy2]),
-              callbacks=[early_stopping, checkpoint])
-    model.load_weights(model_name+f'fold{fold}.h5', {'SeqSelfAttention': SeqSelfAttention})
+    # model.fit_generator(generator=training_generator,
+    #                 steps_per_epoch=x_train.shape[0] // batch_size,
+    #           epochs=1000,
+    #           # batch_size=256,
+    #           verbose=1,
+    #           shuffle=True,
+    #           validation_data=([x_val, y_val], [y_val, dummy2]),
+    #           callbacks=[checkpoint])
+    model.load_weights(model_name+f'model{count}.h5', {'SeqSelfAttention': SeqSelfAttention})
     p, _ = model.predict([t, t_dummy], verbose=0, batch_size=batch_size)
-    proba_t += p / 10.
+    # sub.behavior_id = np.argmax(p, axis=1)
+    # pred_list.append(np.argmax(p, axis=1))
+    # sub.to_csv(model_name+'fold'+str(fold)+'.csv', index=False)
+    proba_t += p / 30.
     valid_pred, _ = model.predict([x_val, y_val], verbose=0, batch_size=batch_size)
     valid_pred = np.argmax(valid_pred, axis=1)
     acc = cul_acc_combo(y[yy], valid_pred)
@@ -312,10 +374,15 @@ for fold, (xx, yy) in enumerate(kfold.split(x, y)):
     valid_conf = confusion(valid_pred, y[yy])
     print(valid_conf)
     valid_pred_list.append(acc)
+    count += 1
 
 print(valid_pred_list)
-acc_res = sum(valid_pred_list) / 10
+acc_res = sum(valid_pred_list) / 30
 print(acc_res)
-
+# vote_res = res_vote(pred_list)
+np.save(model_name+'proba.npy', proba_t)
 sub.behavior_id = np.argmax(proba_t, axis=1)
-sub.to_csv(model_name+str(acc_res)+'_drop2_bn_bs256+lr3e-4+centerloss0.005+mixup0.3+cbma.csv', index=False)
+sub.to_csv(model_name+str(acc_res)+'_drop3_bn_bs256+lr3e-4+centerloss0.005+mixup0.3+3seed.csv', index=False)
+
+# sub.behavior_id = vote_res
+# sub.to_csv(model_name+str(acc_res)+'_drop3_bn_bs256+lr3e-4+centerloss0.005+mixup0.3+vote.csv', index=False)
