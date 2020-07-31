@@ -1,7 +1,7 @@
 from keras.layers import *
 from keras.models import Model
 from keras import regularizers
-from Model.Sub_block import CenterLossLayer, Attention
+from Model.Sub_block import CenterLossLayer, Attention, MultiHeadsAttModel, NormL
 from keras_self_attention import SeqSelfAttention
 from keras_multi_head import MultiHeadAttention
 from attention import attention_3d_block
@@ -110,6 +110,7 @@ def Net():
     X = Conv2D(filters=64,
                kernel_size=(3, 3),
                padding='same',
+               #dilation_rate=(1, 1),
                # kernel_initializer='he_uniform',
                # bias_initializer='zeros'
                # kernel_regularizer=regularizers.l2(1e-5)
@@ -117,18 +118,19 @@ def Net():
     X = LeakyReLU(0.01)(X)
     X = BatchNormalization()(X)
     X = Dropout(0.3)(X)
-    X = squeeze_excitation_layer(X, out_dim=64, ratio=8)
+    #X = squeeze_excitation_layer(X, out_dim=64, ratio=4)
     #X = cbam_block(X)
 
     X = Conv2D(filters=64,
                kernel_size=(3, 3),
                padding='same',
+               #dilation_rate=(2, 1),
                # kernel_initializer='he_uniform',
                # bias_initializer='zeros'
                # kernel_regularizer=regularizers.l2(1e-5)
                )(X)
     X = LeakyReLU(0.01)(X)
-    X = squeeze_excitation_layer(X, out_dim=64, ratio=4)
+    #X = squeeze_excitation_layer(X, out_dim=64, ratio=4)
     X = MaxPooling2D((2, 2))(X)
     X = BatchNormalization()(X)
     X = Dropout(0.3)(X)
@@ -137,6 +139,7 @@ def Net():
     X = Conv2D(filters=128,
                kernel_size=(3, 3),
                padding='same',
+               #dilation_rate=(2, 1),
                # kernel_initializer='he_uniform',
                # bias_initializer='zeros'
                # kernel_regularizer=regularizers.l2(1e-5)
@@ -144,18 +147,19 @@ def Net():
     X = LeakyReLU(0.01)(X)
     X = BatchNormalization()(X)
     X = Dropout(0.3)(X)
-    X = squeeze_excitation_layer(X, out_dim=128, ratio=8)
+    #X = squeeze_excitation_layer(X, out_dim=128, ratio=4)
     #X = cbam_block(X)
 
     X = Conv2D(filters=128,
                kernel_size=(3, 3),
                padding='same',
+               #dilation_rate=(2, 1),
                # kernel_initializer='he_uniform',
                # bias_initializer='zeros'
                # kernel_regularizer=regularizers.l2(1e-5)
                )(X)
     X = LeakyReLU(0.01)(X)
-    X = squeeze_excitation_layer(X, out_dim=128, ratio=8)
+    #X = squeeze_excitation_layer(X, out_dim=128, ratio=4)
     X = MaxPooling2D((1, 2))(X)
     X = BatchNormalization()(X)
     X = Dropout(0.3)(X)
@@ -164,6 +168,7 @@ def Net():
     X = Conv2D(filters=256,
                kernel_size=(3, 3),
                padding='same',
+               #dilation_rate=(4, 1),
                # kernel_initializer='he_uniform',
                # bias_initializer='zeros'
                # kernel_regularizer=regularizers.l2(1e-5)
@@ -171,12 +176,13 @@ def Net():
     X = LeakyReLU(0.01)(X)
     X = BatchNormalization()(X)
     X = Dropout(0.3)(X)
-    X = squeeze_excitation_layer(X, out_dim=256, ratio=8)
+    #X = squeeze_excitation_layer(X, out_dim=256, ratio=4)
     #X = cbam_block(X)
 
     X = Conv2D(filters=512,
                kernel_size=(3, 3),
                padding='same',
+               #dilation_rate=(4, 1),
                # kernel_initializer='he_uniform',
                # bias_initializer='zeros'
                # kernel_regularizer=regularizers.l2(1e-5)
@@ -184,15 +190,24 @@ def Net():
     X = LeakyReLU(0.01)(X)
     X = BatchNormalization()(X)
     X = Dropout(0.3)(X)
-    X = squeeze_excitation_layer(X, out_dim=512, ratio=8)
+    #X = squeeze_excitation_layer(X, out_dim=512, ratio=4)
     #X = cbam_block(X)
+    # X = Reshape((30 * 2, 512))(X)
+    # att = MultiHeadsAttModel(l=30 * 2, d=512, dv=64, dout=512, nv=8)
+    # X = att([X, X, X])
+    # X = Reshape((30, 2, 512))(X)
+    # X = NormL()(X)
+    #X = Reshape((-1, 2 * 512))(X)
+
     X = Reshape((-1, 2*512))(X)
 
     # X = attention_3d_block(X)
     # X = SeqSelfAttention(attention_activation='sigmoid')(X)
     # X = Dropout(0.3)(X)
     # X = Dense(128, activation='relu')(X)
-    #X = GRU(64, return_sequences=True, dropout=0.2, recurrent_dropout=0.2)(X)
+    # X = TimeDistributed(Dense(256, activation='relu'))(X)
+    # X = GRU(128, return_sequences=True, dropout=0.2, recurrent_dropout=0.2)(X)
+    # X = GRU(128, return_sequences=True, dropout=0.2, recurrent_dropout=0.2)(X)
     #X = GRU(64, return_sequences=True, dropout=0.2, recurrent_dropout=0.2)(X)
 
     X = GlobalAveragePooling1D()(X)

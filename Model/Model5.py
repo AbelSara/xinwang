@@ -13,7 +13,7 @@ def Net():
                )(input)
     X = LeakyReLU(0.01)(X)
     X = BatchNormalization()(X)
-    X = Dropout(0.4)(X)
+    X = Dropout(0.3)(X)
 
     X = Conv2D(filters=64,
                kernel_size=(3, 3),
@@ -23,7 +23,7 @@ def Net():
     X = LeakyReLU(0.01)(X)
     X = MaxPooling2D((2, 2))(X)
     X = BatchNormalization()(X)
-    X = Dropout(0.4)(X)
+    X = Dropout(0.3)(X)
 
     X = Conv2D(filters=128,
                kernel_size=(3, 3),
@@ -32,7 +32,7 @@ def Net():
                )(X)
     X = LeakyReLU(0.01)(X)
     X = BatchNormalization()(X)
-    X = Dropout(0.4)(X)
+    X = Dropout(0.3)(X)
 
     X = Conv2D(filters=128,
                kernel_size=(3, 3),
@@ -40,9 +40,9 @@ def Net():
                #kernel_regularizer=regularizers.l2(0.0005)
                )(X)
     X = LeakyReLU(0.01)(X)
-    X = MaxPooling2D((1, 2))(X)
+    X = MaxPooling2D((2, 2))(X)
     X = BatchNormalization()(X)
-    X = Dropout(0.4)(X)
+    X = Dropout(0.3)(X)
 
     X = Conv2D(filters=256,
                kernel_size=(3, 3),
@@ -51,8 +51,16 @@ def Net():
                )(X)
     X = LeakyReLU(0.01)(X)
     X = BatchNormalization()(X)
-    X = Dropout(0.4)(X)
-
+    X = Dropout(0.3)(X)
+    X = Conv2D(filters=256,
+               kernel_size=(3, 3),
+               padding='same',
+               # kernel_regularizer=regularizers.l2(0.0005)
+               )(X)
+    X = LeakyReLU(0.01)(X)
+    X = BatchNormalization()(X)
+    X = Dropout(0.3)(X)
+    X = MaxPooling2D((1, 2))(X)
     X = Conv2D(filters=512,
                kernel_size=(3, 3),
                padding='same',
@@ -60,12 +68,12 @@ def Net():
                )(X)
     X = LeakyReLU(0.01)(X)
     X = BatchNormalization()(X)
-    X = Dropout(0.4)(X)
-    X = Reshape((-1, 2*512))(X)
-    # X = Dropout(0.3)(X)
-    # X = TimeDistributed(Dense(256, activation='relu'))(X)
-    # X = GRU(128, return_sequences=True, dropout=0.3, recurrent_dropout=0.3)(X)
-    # X = GRU(128, return_sequences=True, dropout=0.3, recurrent_dropout=0.3)(X)
+    X = Dropout(0.3)(X)
+    X = Reshape((-1, 512))(X)
+    #X = Dropout(0.3)(X)
+    #X = Dense(128, activation='relu')(X)
+    X = GRU(128, return_sequences=True, dropout=0.2, recurrent_dropout=0.2)(X)
+    X = GRU(128, return_sequences=True, dropout=0.2, recurrent_dropout=0.2)(X)
 
     X = GlobalAveragePooling1D()(X)
     #X2 = GlobalMaxPooling1D()(X)
